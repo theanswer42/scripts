@@ -83,17 +83,18 @@ then
     MEDIA_TYPE="err"
 fi
 
-if [ "$MEDIA_NAME" = "" ]
-then
-    echo "name cannot be blank"
-    MEDIA_TYPE="err"
-fi
+## Ignoring name and season for now
 
-if [ "$MEDIA_TYPE" = "show" ] && [ "$SEASON" = "" ]
-then
-    echo "season expected for a show: must be a number"
-    MEDIA_TYPE="err"
-fi
+# if [ "$MEDIA_NAME" = "" ]
+# then
+#     echo "name cannot be blank"
+#     MEDIA_TYPE="err"
+# fi
+# if [ "$MEDIA_TYPE" = "show" ] && [ "$SEASON" = "" ]
+# then
+#     echo "season expected for a show: must be a number"
+#     MEDIA_TYPE="err"
+# fi
 
 if [ "$MEDIA_TYPE" != "movie" ] && [ "$MEDIA_TYPE" != "show" ]
 then
@@ -101,3 +102,4 @@ then
     exit 1
 fi
 
+find "$SOURCE_DIR" \( -name \*.avi -o -name \*.divx -o -name \*.m4v -o -name \*.mkv -o -name \*.mp4 -o -name \*.ogm \) -exec convert_single_video.sh -f "{}" \; 
