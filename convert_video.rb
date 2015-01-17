@@ -1,10 +1,26 @@
 #!/usr/bin/ruby
 
-# Building the options
-# 1. for Video, This is straightforward:
-# if(video stream is encoded with x264) { copy }
-# else { add x264 with options }
+require 'fileutils'
 
+class CvLogger
+  LOG_DIR = File.join(ENV["HOME"], "log/convert_video")
+  
+  def self.logfilename
+    @logfilename ||= "#{Time.now.to_i}_#{rand(1000)}.log"
+  end
+  
+  def self.log(command, output)
+    FileUtils.mkdir_p(LOG_DIR)
+    file = File.open(File.join(LOG_DIR, self.logfilename), "a")
+    file << "#{Time.now.to_s}\n"
+    file << "#{command}\n"
+    file << "---\n"
+    file << output
+    file << "\n---\n"
+    file.close
+  end
+end
+# This is a pretty good summary of how i'm going to encode:
 CODECS = {
   :video => {
     :copy => ["h264", "png", "mjpeg"],
@@ -14,7 +30,7 @@ CODECS = {
   :audio => {
     :copy => ["aac", "mp3"],
     :encode => ["ac3", "dts", "flac", "vorbis"],
-    :options => "libfdk_aac --cutoff 15000 -vbr 5",
+    :options => "libfdk_aac -cutoff 15000 -vbr 5",
   },
   :subtitle => {
     :copy => ["mov_text"],
@@ -25,6 +41,8 @@ CODECS = {
 
 def get_stream_options(stream)
   codecs = CODECS[stream[:codec_type].to_sym]
+  return "" unless codecs
+  
   if codecs[:copy].include?(stream[:codec_name])
     return "copy"
   elsif codecs[:encode].include?(stream[:codec_name])
@@ -41,7 +59,7 @@ def get_sub_stream(streams)
     subtitle_streams.first
 end
 
-# return status, stdout+stderr
+# return stdout+stderr
 def run_command(command)
   command = "#{command} 2>&1"
   output = status = nil
@@ -52,17 +70,17 @@ def run_command(command)
     output = e.inspect
     status = false
   end
-  return [status, output]
+  CvLogger.log(command, output)
+  if !status
+    puts command
+    puts output
+    raise "command failed"
+  end
+  return output
 end
 
 def ffprobe(filename)
-  status, output = run_command("ffprobe -show_streams -i \"#{filename}\"")
-  if !status
-    puts output
-    raise "ffprobe failed for \"#{filename}\""
-  end  
-  
-  ffprobe_output = output.split("\n").collect {|l| l.strip }
+  ffprobe_output = run_command("ffprobe -show_streams -i \"#{filename}\"").split("\n").collect {|l| l.strip }
 
   stream_keys = ["codec_type", "codec_name", "TAG:language"]
   key_map = {"TAG:language" => "language"}
@@ -131,11 +149,11 @@ def convert_video(filename)
     options << "\"#{mp4_name}\""
     
     # We can now run the encode
-    status, output = run_command("ffmpeg -nostats #{options.join(' ')}")
-    if !status
-      File.rm(mp4_name)
-      puts output
-      raise "ffmpeg failed for \"#{filename}\""
+    begin
+      run_command("ffmpeg -nostats #{options.join(' ')}")
+    rescue Exception => e
+      File.delete(mp4_name) if File.exists?(mp4_name)
+      raise e
     end
   end
   return mp4_name
@@ -164,10 +182,11 @@ def extract_srt(filename)
     if sub_stream = get_sub_stream(streams)
       extract_subs_options << "-map #{sub_stream[:stream_specifier]} -c:#{sub_stream[:stream_specifier]} srt"
       extract_subs_options << "\"#{videoname}.srt\""
-      status, output = run_command("ffmpeg -nostats #{extract_subs_options.join(' ')}")
-      if !status
-        puts output
-        raise "ffmpeg (extract srt) failed for: \"#{filename}\""
+      begin
+        run_command("ffmpeg -nostats #{extract_subs_options.join(' ')}")
+      rescue Exception => e
+        File.delete(srt_name) if File.exists?(srt_name)
+        raise e
       end
     else
       return nil
@@ -182,10 +201,11 @@ def extract_vtt(filename)
 
   # next up, generate an srt file.
   unless File.exists?(vtt_name)
-    status, output = run_command("ffmpeg -nostats -i \"#{filename}\" -map s:0 -c:s webvtt \"#{vtt_name}\"")
-    if !status
-      puts output
-      raise "ffmpeg (extract vtt) failed for: \"#{filename}\""
+    begin
+      run_command("ffmpeg -nostats -i \"#{filename}\" -map s:0 -c:s webvtt \"#{vtt_name}\"")
+    rescue Exception => e
+      File.delete(vtt_name) if File.exists?(vtt_name)
+      raise e
     end
   end
   return vtt_name
@@ -193,6 +213,7 @@ end
 
 
 filename = ARGV[0]
+
 raise "Not a file: #{filename}" unless(File.file?(filename))
 
 mp4_name = convert_video(filename)
@@ -200,7 +221,4 @@ srt_name = extract_srt(mp4_name)
 vtt_name = extract_vtt(srt_name) if srt_name
 
 puts "Done!"
-
-
-
 
