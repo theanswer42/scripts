@@ -251,8 +251,18 @@ elsif File.directory?(source)
     copy = true
   end
   
-  Dir.glob(File.join(source, "**", "*")) do |name|
-    puts name
+  Dir.glob(File.join(source, "**", "*")) do |path|
+    relative_path = path.gsub(/^#{source}/, '').gsub(/^\//, '')
+
+    if File.directory?(path)
+      # FileUtils.mkdir_p(File.join(destination, relative_path))
+      puts "mkdir -p #{File.join(destination, relative_path)}"
+    elsif File.file?(path) && VIDEO_EXTENSIONS.include?(File.extname(path).downcase)
+      v = VideoConverter.new(path)
+      result_files = v.convert
+      # FileUtils.mv(result_files.values, File.join(destination, File.dirname(relative_path)))
+      puts "mv #{result_files.values.join(' ')} #{File.join(destination, File.dirname(relative_path))}"
+    end
   end
   
 end
