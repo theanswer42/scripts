@@ -19,9 +19,9 @@ md5sum ${archive_name} > ${archive_name}.md5sum
 last_backup_md5_file=`ls -c ${BACKUPDIR}/*.md5sum | head -1`
 last_backup_md5=`cat ${last_backup_md5_file} | cut -f1 -d" "`
 if grep ${last_backup_md5} ${archive_name}.md5sum > /dev/null; then
-    echo "No Changes since last backup."
+    echo `date` ": No Changes since last backup."
 else
-    echo "New changes detected. Copying."
+    echo `date` ": New changes detected. Copying."
     cp ${archive_name} ${archive_name}.md5sum ${BACKUPDIR}/
 fi
 rm ${TMPDIR}/*

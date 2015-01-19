@@ -6,18 +6,40 @@ class CvLogger
   LOG_DIR = File.join(ENV["HOME"], "log/convert_video")
   
   def self.logfilename
-    @logfilename ||= "#{Time.now.to_i}_#{rand(1000)}.log"
+    unless @logfilename
+      FileUtils.mkdir_p(LOG_DIR)
+      @logfilename ||= "#{Time.now.to_i}_#{rand(1000)}.log"
+    end
+    @logfilename
   end
   
-  def self.log(command, output)
+  def self.log_command(command, output)
+    text = "#{Time.now.to_s}\n"
+    text << "#{command}\n"
+    text << "---\n"
+    text << output
+    text << "\n---\n"
+    self.log(text)
+  end
+
+  def self.log_line(line)
+    line = "#{Time.now} : #{line}\n"
+    self.log("#{Time.now} : #{line}\n")
+    puts line
+  end
+
+  def self.log(text, options={})
+    
     FileUtils.mkdir_p(LOG_DIR)
     file = File.open(File.join(LOG_DIR, self.logfilename), "a")
-    file << "#{Time.now.to_s}\n"
-    file << "#{command}\n"
-    file << "---\n"
-    file << output
-    file << "\n---\n"
+    file << text
+    if text[-1] != "\n"
+      file << "\n"
+    end
     file.close
+    if options[:verbose]
+      puts text
+    end
   end
 end
 
@@ -78,7 +100,7 @@ class VideoConverter
       output = e.inspect
       status = false
     end
-    CvLogger.log(command, output)
+    CvLogger.log_command(command, output)
     if !status
       puts command
       puts output
@@ -250,18 +272,35 @@ elsif File.directory?(source)
   if !destination.nil? && !destination.empty? && File.directory?(destination)
     copy = true
   end
+  CvLogger.log_line("Converting directory: #{source}, into: #{destination}")
+  if copy
+    CvLogger.log_line("mkdir -p #{File.join(destination, File.basename(source))}")
+    FileUtils.mkdir_p(File.join(destination, File.basename(source)))
+  end
   
   Dir.glob(File.join(source, "**", "*")) do |path|
     relative_path = path.gsub(/^#{source}/, '').gsub(/^\//, '')
 
     if File.directory?(path)
-      # FileUtils.mkdir_p(File.join(destination, relative_path))
-      puts "mkdir -p #{File.join(destination, relative_path)}"
+      if copy
+        CvLogger.log_line("mkdir -p #{File.join(destination, File.basename(source), relative_path)}")
+        FileUtils.mkdir_p(File.join(destination, File.basename(source), relative_path))
+      end
     elsif File.file?(path) && VIDEO_EXTENSIONS.include?(File.extname(path).downcase)
+      CvLogger.log_line("Converting: #{path}")
       v = VideoConverter.new(path)
-      result_files = v.convert
-      # FileUtils.mv(result_files.values, File.join(destination, File.dirname(relative_path)))
-      puts "mv #{result_files.values.join(' ')} #{File.join(destination, File.dirname(relative_path))}"
+      begin
+        result_files = v.convert
+      rescue Exception => e
+        CvLogger.log_line("Exception while processing: #{path}")
+        CvLogger.log(e.inspect + "\n" + e.backtrace.join("\n"))
+        next
+      end
+      CvLogger.log_line("Done: #{result_files.values.join(',')}")
+      if copy
+        CvLogger.log_line("mv #{result_files.values.join(' ')} #{File.join(destination, File.basename(source), File.dirname(relative_path))}")
+        FileUtils.mv(result_files.values.compact, File.join(destination, File.basename(source), File.dirname(relative_path)))
+      end
     end
   end
   
