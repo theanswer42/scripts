@@ -221,6 +221,11 @@ class VideoConverter
         return nil
       end
     end
+    # Here, its possible that the srt could be empty. In this case, I want to return empty.
+    if File.read(srt_name).strip.empty?
+      return nil
+    end
+
     return srt_name
   end
 
