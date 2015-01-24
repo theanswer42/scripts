@@ -58,7 +58,7 @@ class VideoConverter
     },
     :subtitle => {
       :copy => ["mov_text"],
-      :encode => ["srt", "ass", "dvdsub", "xsub", "microdvd"],
+      :encode => ["srt", "ass", "xsub", "microdvd", "text"],
       :options => "mov_text",
     }
   }
@@ -173,7 +173,7 @@ class VideoConverter
       # ffmpeg and doesn't seem to pick up the specific sub option correctly. 
       if sub_stream = get_sub_stream(streams)
         sub_options = get_stream_options(sub_stream)
-        options << "-map #{sub_stream[:stream_specifier]} -c:s #{sub_options} -metadata:#{sub_stream[:stream_specifier]} title=\"English\""
+        options << "-map #{sub_stream[:stream_specifier]} -c:s #{sub_options} -metadata:#{sub_stream[:stream_specifier]} title=\"English\"" if sub_options
       end
       
       options << "\"#{mp4_name}\""
