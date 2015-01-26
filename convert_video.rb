@@ -1,5 +1,8 @@
 #!/usr/bin/ruby
 
+FFPROBE = "/opt/ffmpeg/bin/ffprobe"
+FFMPEG = "/opt/ffmpeg/bin/ffmpeg"
+
 require 'fileutils'
 
 class CvLogger
@@ -110,7 +113,7 @@ class VideoConverter
   end
 
   def ffprobe(filename)
-    ffprobe_output = run_command("ffprobe -show_streams -i \"#{filename}\"").split("\n").collect {|l| l.strip }
+    ffprobe_output = run_command("#{FFPROBE} -show_streams -i \"#{filename}\"").split("\n").collect {|l| l.strip }
 
     stream_keys = ["codec_type", "codec_name", "TAG:language"]
     key_map = {"TAG:language" => "language"}
@@ -180,7 +183,7 @@ class VideoConverter
       
       # We can now run the encode
       begin
-        run_command("ffmpeg -nostats #{options.join(' ')}")
+        run_command("#{FFMPEG} -nostats #{options.join(' ')}")
       rescue Exception => e
         File.delete(mp4_name) if File.exists?(mp4_name)
         raise e
@@ -212,7 +215,7 @@ class VideoConverter
         extract_subs_options << "-map #{sub_stream[:stream_specifier]} -c:#{sub_stream[:stream_specifier]} srt"
         extract_subs_options << "\"#{videoname}.srt\""
         begin
-          run_command("ffmpeg -nostats #{extract_subs_options.join(' ')}")
+          run_command("#{FFMPEG} -nostats #{extract_subs_options.join(' ')}")
         rescue Exception => e
           File.delete(srt_name) if File.exists?(srt_name)
           raise e
@@ -235,7 +238,7 @@ class VideoConverter
     # next up, generate an srt file.
     unless File.exists?(vtt_name)
       begin
-        run_command("ffmpeg -nostats -i \"#{srt_name}\" -map s:0 -c:s webvtt \"#{vtt_name}\"")
+        run_command("#{FFMPEG} -nostats -i \"#{srt_name}\" -map s:0 -c:s webvtt \"#{vtt_name}\"")
       rescue Exception => e
         File.delete(vtt_name) if File.exists?(vtt_name)
         raise e
