@@ -255,7 +255,7 @@ class VideoConverter
 end
 
 
-# There are three ways to call this:
+# There are four ways to call this:
 # convert_video.rb filename
 #   - This will convert a single file
 # convert_video.rb directory
@@ -264,18 +264,49 @@ end
 # convert_video.rb source_directory destination_directory
 #   - same as convert directory, but now the converted files will be copied in the same path
 #     in the destination_directory
+# convert_video.rb source_directory destination_directory failure_directory
+#   - same as convert directory with destination. Except now, anything that
+#     fails gets moved over to the failure_directory.
+#     This allows scheduling the converter. 
 
 VIDEO_EXTENSIONS = [".avi", ".divx", ".m4v", ".mkv", ".mp4", ".ogm"]
 
+PID_FILE_PATH = File.join(ENV["HOME"], "log", "convert_video", "convert_video.pid")
+def check_pid()
+  if File.exists?(PID_FILE_PATH)
+    raise "Another convert process is running: #{File.read(PID_FILE_PATH)}"
+  end
+  pid = File.open(PID_FILE_PATH, "w")
+  pid << "#{Process.pid}\n"
+  pid.close
+  return true
+end
+
+def release_pid()
+  FileUtils.rm(PID_FILE_PATH)
+end
+
+check_pid()
+
 source = ARGV[0]
 if File.file?(source)
-  v = VideoConverter.new(ARGV[0])
-  v.convert
+  begin
+    v = VideoConverter.new(ARGV[0])
+    v.convert
+  rescue Exception => e
+    CvLogger.log_line("Exception while processing: #{ARGV[0]}")
+    CvLogger.log(e.inspect + "\n" + e.backtrace.join("\n"))
+  end
 elsif File.directory?(source)
   copy = false
   destination = ARGV[1]
+  failure_destination = ARGV[2]
+  
   if !destination.nil? && !destination.empty? && File.directory?(destination)
     copy = true
+  end
+  if !failure_destination.nil? && !failure_destination.empty? && File.directory?(failure_destination)
+    copy_on_fail = true
   end
   CvLogger.log_line("Converting directory: #{source}, into: #{destination}")
   if copy
@@ -299,6 +330,15 @@ elsif File.directory?(source)
       rescue Exception => e
         CvLogger.log_line("Exception while processing: #{path}")
         CvLogger.log(e.inspect + "\n" + e.backtrace.join("\n"))
+
+        if copy_on_fail
+          dest_fail_dir = File.join(failure_destination, File.dirname(source))
+          CvLogger.log_line("mkdir -p #{dest_fail_dir}")
+          FileUtils.mkdir_p(dest_fail_dir)
+          CvLogger.log_line("mv #{path} #{dest_fail_dir}")
+          FileUtils.mv(path, dest_fail_dir)          
+        end
+        
         next
       end
       CvLogger.log_line("Done: #{result_files.values.join(',')}")
@@ -308,7 +348,6 @@ elsif File.directory?(source)
       end
     end
   end
-  
 end
 
-
+release_pid()
