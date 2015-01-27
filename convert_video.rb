@@ -335,7 +335,7 @@ elsif File.directory?(source)
         CvLogger.log(e.inspect + "\n" + e.backtrace.join("\n"))
 
         if copy_on_fail
-          dest_fail_dir = File.join(failure_destination, File.dirname(source))
+          dest_fail_dir = File.join(failure_destination, File.dirname(relative_path))
           CvLogger.log_line("mkdir -p #{dest_fail_dir}")
           FileUtils.mkdir_p(dest_fail_dir)
           CvLogger.log_line("mv #{path} #{dest_fail_dir}")
