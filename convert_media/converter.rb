@@ -21,6 +21,11 @@ class ConvertMedia::Converter
     }
   }
 
+  # As far as possible, we don't want to convert one lossy format into another
+  # see: https://trac.ffmpeg.org/wiki/Encode/HighQualityAudio
+  # Which is why we'll let other html5-compatible audio codecs go through
+  # see:https://developer.mozilla.org/en-US/docs/Web/HTML/Supported_media_formats#Browser_compatibility
+  
   AUDIO_CTR_CODECS = {
     :audio => {
       :copy => ["mp3", "vorbis", "opus"],
@@ -63,6 +68,50 @@ class ConvertMedia::Converter
     return {:failed => [filename]}
   end
 
+  def self.convert_audio(filename)
+    streams = ConvertVideo::Ffmpeg.ffprobe(filename)
+    extension = File.extname(filename)
+    
+    audio_stream = streams.detect {|stream| stream[:codec_type] == "audio" }
+    raise "no audio stream found for: \"#{filename}\"" unless audio_stream
+    
+    # There is one little hole here. ogg containers can contain other audio
+    # codecs than vorbis and opus: flac or pcm.
+    # I do not currently support that (I'd have to then worry about what to do
+    # With the converted file, which will potentially have the same name)
+    
+    if [".oga", ".ogg"].include?(extension)
+      if !["opus", "vorbis"].include?(audio_stream[:codec_name])
+        raise "#{audio_stream[:codec_name]} codec in ogg is not yet supported: #{filename}"
+      end
+      return {:converted => [filename]}
+    end
+    oga_name = "#{medianame(filename)}.oga"
+
+    # If the audio stream does not need transcoding, then let it go.
+    audio_stream_options = get_stream_options(:audio, audio_stream)
+    if audio_stream_options == "copy"
+      return {:converted => [filename]}
+    end
+
+    options = ["-nostats"]
+    streams.each do |stream|
+      stream_options = get_stream_options(:audio, stream)
+      unless stream_options.empty?
+        options << "-map #{stream[:stream_specifier]} -c:#{stream[:stream_specifier]} #{stream_options}"
+      end
+    end
+    
+    begin
+      ConvertMedia::Ffmpeg.ffmpeg([], filename, options, oga_name)
+    rescue Exception => e
+      File.delete(oga_name) if File.exists?(oga_name)
+      raise e
+    end
+  
+    return {:converted => [mp4_name], :original => [filename]}
+  end
+  
   def self.convert_video(filename)
     return {:converted => [filename]} if File.extname(filename) == ".mp4"
     
@@ -73,7 +122,7 @@ class ConvertMedia::Converter
     unless streams.detect {|stream| stream[:codec_type] == 'video' }
       raise "no video stream found for: \"#{filename}\""
     end
-    options = []
+    options = ["-nostats"]
     streams.each do |stream|
       # We'll handle subs later
       next if stream[:codec_type] == "subtitle"
@@ -91,11 +140,10 @@ class ConvertMedia::Converter
       sub_options = get_stream_options(sub_stream)
       options << "-map #{sub_stream[:stream_specifier]} -c:s #{sub_options} -metadata:#{sub_stream[:stream_specifier]} title=\"English\"" if sub_options
     end
-
+    
     # We can now run the encode
     begin
       ConvertMedia::Ffmpeg.ffmpeg(["-fix_sub_duration"], filename, options, mp4_name)
-      run_command("#{FFMPEG} -nostats #{options.join(' ')}")
     rescue Exception => e
       File.delete(mp4_name) if File.exists?(mp4_name)
       raise e
