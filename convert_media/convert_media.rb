@@ -43,7 +43,7 @@ class ConvertMedia::ConvertMedia
       end
       opts.on("--original DIRECTORY",
               "Move source files after conversion into this directory") do |directory|
-        options.originals = directory
+        options.original = directory
       end
       opts.on("--pid FILENAME",
               "Path to the pid file to use") do |filename|
