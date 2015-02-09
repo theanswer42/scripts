@@ -1,6 +1,6 @@
 require 'fileutils'
-require 'logger'
-require 'ffmpeg'
+require './logger'
+require './ffmpeg'
 
 module ConvertMedia
   class Converter
@@ -44,9 +44,9 @@ module ConvertMedia
     end
     
     def self.convert(filename, options={})
-      streams = ConvertMedia::Ffmpeg.ffprobe(filename)
+      streams = ::ConvertMedia::Ffmpeg.ffprobe(filename)
       video_codecs = VIDEO_CTR_CODECS[:video][:copy] + VIDEO_CTR_CODECS[:video][:encode]
-      audio_codecs = AUDIO_CTR_CODECS[:video][:copy] + AUDIO_CTR_CODECS[:video][:encode]
+      audio_codecs = AUDIO_CTR_CODECS[:audio][:copy] + AUDIO_CTR_CODECS[:audio][:encode]
       result = {}
       
       if streams.detect {|stream| stream[:codec_type] == "video" && video_codecs.include?(stream[:codec_name]) }
@@ -67,13 +67,13 @@ module ConvertMedia
       return result
       
     rescue Exception => e
-      ConvertMedia::Logger.log_line("Exception while processing: #{filename}")
-      ConvertMedia::Logger.log(e.inspect + "\n" + e.backtrace.join("\n"))
+      ::ConvertMedia::Logger.log_line("Exception while processing: #{filename}")
+      ::ConvertMedia::Logger.log(e.inspect + "\n" + e.backtrace.join("\n"))
       return {:failed => [filename]}
     end
 
     def self.convert_audio(filename, options={})
-      streams = ConvertVideo::Ffmpeg.ffprobe(filename)
+      streams = ::ConvertMedia::Ffmpeg.ffprobe(filename)
       extension = File.extname(filename)
       
       audio_stream = streams.detect {|stream| stream[:codec_type] == "audio" }
@@ -98,27 +98,27 @@ module ConvertMedia
         return {:converted => [filename]}
       end
 
-      options = ["-nostats"]
+      output_options = []
       streams.each do |stream|
         stream_options = get_stream_options(:audio, stream)
         unless stream_options.empty?
-          options << "-map #{stream[:stream_specifier]} -c:#{stream[:stream_specifier]} #{stream_options}"
+          output_options << "-map #{stream[:stream_specifier]} -c:#{stream[:stream_specifier]} #{stream_options}"
         end
       end
 
       if options[:dry_run]
-        ConvertMedia::Ffmpeg.noop_ffmpeg([], filename, options, oga_name)
-        return {:converted => [mp4_name], :original => [filename]}
+        ::ConvertMedia::Ffmpeg.noop_ffmpeg([], filename, output_options, oga_name)
+        return {:converted => [oga_name], :original => [filename]}
       end
       
       begin
-        ConvertMedia::Ffmpeg.ffmpeg([], filename, options, oga_name)
+        ::ConvertMedia::Ffmpeg.ffmpeg([], filename, output_options, oga_name)
       rescue Exception => e
         File.delete(oga_name) if File.exists?(oga_name)
         raise e
       end
       
-      return {:converted => [mp4_name], :original => [filename]}
+      return {:converted => [oga_name], :original => [filename]}
     end
     
     def self.convert_video(filename, options={})
@@ -127,18 +127,18 @@ module ConvertMedia
       mp4_name = "#{medianame(filename)}.mp4"
       return {:converted => [mp4_name], :original => [filename]} if File.file?(mp4_name)
       
-      streams = ConvertVideo::Ffmpeg.ffprobe(filename)
+      streams = ::ConvertMedia::Ffmpeg.ffprobe(filename)
       unless streams.detect {|stream| stream[:codec_type] == 'video' }
         raise "no video stream found for: \"#{filename}\""
       end
-      options = ["-nostats"]
+      output_options = []
       streams.each do |stream|
         # We'll handle subs later
         next if stream[:codec_type] == "subtitle"
         
         stream_options = get_stream_options(:video, stream)
         unless stream_options.empty?
-          options << "-map #{stream[:stream_specifier]} -c:#{stream[:stream_specifier]} #{stream_options}"
+          output_options << "-map #{stream[:stream_specifier]} -c:#{stream[:stream_specifier]} #{stream_options}"
         end
       end
 
@@ -146,18 +146,18 @@ module ConvertMedia
       # This is because with multiple sub tracks in the input, it seems to confuse
       # ffmpeg and doesn't seem to pick up the specific sub option correctly. 
       if sub_stream = get_sub_stream(streams)
-        sub_options = get_stream_options(sub_stream)
-        options << "-map #{sub_stream[:stream_specifier]} -c:s #{sub_options} -metadata:#{sub_stream[:stream_specifier]} title=\"English\"" if sub_options
+        sub_options = get_stream_options(:video, sub_stream)
+        output_options << "-map #{sub_stream[:stream_specifier]} -c:s #{sub_options} -metadata:#{sub_stream[:stream_specifier]} title=\"English\"" if sub_options
       end
       
       if options[:dry_run]
-        ConvertMedia::Ffmpeg.noop_ffmpeg(["-fix_sub_duration"], filename, options, mp4_name)
+        ::ConvertMedia::Ffmpeg.noop_ffmpeg(["-fix_sub_duration"], filename, output_options, mp4_name)
         return {:converted => [mp4_name], :original => [filename]}
       end
 
       # We can now run the encode
       begin
-        ConvertMedia::Ffmpeg.ffmpeg(["-fix_sub_duration"], filename, options, mp4_name)
+        ::ConvertMedia::Ffmpeg.ffmpeg(["-fix_sub_duration"], filename, output_options, mp4_name)
       rescue Exception => e
         File.delete(mp4_name) if File.exists?(mp4_name)
         raise e
@@ -174,13 +174,13 @@ module ConvertMedia
       
       return srt_name if File.exists?(srt_name)
       
-      streams = MediaConvert::Ffmpeg.ffprobe(filename)
+      streams = ::ConvertMedia::Ffmpeg.ffprobe(filename)
 
       sub_stream = get_sub_stream(streams)
       return "" if !sub_stream
       sub_options = ["-map #{sub_stream[:stream_specifier]} -c:#{sub_stream[:stream_specifier]} srt"]
       begin
-        MediaConvert::Ffmpeg.ffmpeg(["-fix_sub_duration"], mp4_name, sub_options, srt_name)
+        ::ConvertMedia::Ffmpeg.ffmpeg(["-fix_sub_duration"], mp4_name, sub_options, srt_name)
       rescue Exception => e
         FileUtils.rm(srt_name) if File.exists?(srt_name)
         return ""
@@ -200,7 +200,7 @@ module ConvertMedia
       return vtt_name if File.exists?(vtt_name)
       
       begin
-        MediaConvert::Ffmpeg.ffmpeg([], filename, ["-map s:0 -c:s webvtt"], vtt_name)
+        ::ConvertMedia::Ffmpeg.ffmpeg([], filename, ["-map s:0 -c:s webvtt"], vtt_name)
       rescue Exception => e
         FileUtils.rm(vtt_name) if File.exists?(vtt_name)
         return ""

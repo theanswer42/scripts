@@ -1,4 +1,5 @@
 require './logger.rb'
+
 module ConvertMedia 
   class Ffmpeg
     FFPROBE = "/opt/ffmpeg/bin/ffprobe"
@@ -16,7 +17,7 @@ module ConvertMedia
         output = e.inspect
         status = false
       end
-      ConvertMedia::Logger.log_command(command, output)
+      ::ConvertMedia::Logger.log_command(command, output)
       if !status
         puts command
         puts output
@@ -26,12 +27,12 @@ module ConvertMedia
     end
 
     def self.noop_ffmpeg(input_options, input_filename, output_options, output_filename)
-      command = "#{FFMPEG} #{input_options.join(' ')} -i \"#{input_filename}\" #{output_options.join(' ')} \"#{output_filename}\""
-      ConvertMedia::Logger.log_command(command, "noop")
+      command = "#{FFMPEG} -nostats #{input_options.join(' ')} -i \"#{input_filename}\" #{output_options.join(' ')} \"#{output_filename}\""
+      ::ConvertMedia::Logger.log_command(command, "noop")
     end
 
     def self.ffmpeg(input_options, input_filename, output_options, output_filename)
-      run_command("#{FFMPEG} #{input_options.join(' ')} -i \"#{input_filename}\" #{output_options.join(' ')} \"#{output_filename}\"")
+      run_command("#{FFMPEG} -nostats #{input_options.join(' ')} -i \"#{input_filename}\" #{output_options.join(' ')} \"#{output_filename}\"")
     end
     
     def self.ffprobe(filename)

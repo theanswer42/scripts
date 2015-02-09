@@ -4,18 +4,14 @@ require 'ostruct'
 require 'fileutils'
 require 'pp'
 
-require 'logger'
-require 'converter'
+require './logger'
+require './converter'
 
 class ConvertMedia::ConvertMedia
   private
   def get_options(args)
     options = OpenStruct.new
-    
-    # These are the defaults
-    options.pid = File.join(ENV["HOME"], "log", "convert_video", "convert_video.pid")
-    options.log = File.join(ENV["HOME"], "log", "convert_video")
-    
+        
     opt_parser = OptionParser.new do |opts|
       opts.banner = "Usage: convert_media.rb options"
       opts.separator ""
@@ -65,11 +61,16 @@ class ConvertMedia::ConvertMedia
     opt_parser.parse!(args)
 
     if(options.config_file)
-      raise "--config #{filename} - file does not exist" unless File.exists?(filename)
-      config = YAML.load(File.read(config_file))
+      raise "--config #{options.config_file} - file does not exist" unless File.exists?(options.config_file)
+      config = YAML.load(File.read(options.config_file))
       config.merge!(options.to_h)
       options = OpenStruct.new(config)
     end
+    
+    # These are the defaults
+    options.pid = File.join(ENV["HOME"], "log", "convert_video", "convert_video.pid") unless options.pid
+    options.log = File.join(ENV["HOME"], "log", "convert_video") unless options.log
+
 
     # Check all the options! 
     if options.filename && !File.exists?(options.filename)
@@ -115,11 +116,11 @@ class ConvertMedia::ConvertMedia
   def handle_result(path, result)
     relative_path_dir = ""
     if options.source
-      relative_path_dir = File.dirname(path.gsub(/^#{source}/, '').gsub(/^\//, ''))
+      relative_path_dir = File.dirname(path.gsub(/^#{options.source}/, '').gsub(/^\//, ''))
     end
 
     [:converted, :failed, :original].each do |key|
-      if options[key] && !result[key].empty?
+      if options[key] && result[key] && !result[key].empty?
         destination_dir = File.join(options[key], relative_path_dir)
         unless File.directory?(destination_dir)
           ConvertMedia::Logger.log_line("mkdir -p #{destination_dir}")
@@ -147,11 +148,11 @@ class ConvertMedia::ConvertMedia
     check_pid
     
     if options.filename
-      handle_result(ConvertMedia::Converter.convert(options.filename, :dry_run => options.dry_run))
+      handle_result(options.filename, ConvertMedia::Converter.convert(options.filename, :dry_run => options.dry_run))
     else
       Dir.glob(File.join(options.source, "**", "*")) do |path|
         if File.file?(path)
-          handle_result(ConvertMedia::Converter.convert(path, :dry_run => options.dry_run))
+          handle_result(path, ConvertMedia::Converter.convert(path, :dry_run => options.dry_run))
         end
       end
     end
