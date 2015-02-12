@@ -3,6 +3,7 @@
 # Install all the "base" files. Right now, includes:
 # dotfiles
 # scripts
+# convert_video (installs in ~/opt/convert_video)
 
 ################
 # Dotfiles
@@ -29,3 +30,10 @@ cp ~/source/atlantis/dotfiles/gitignore ~/.config/git/ignore
 
 cd ~/source/atlantis/scripts
 cp * ~/bin/
+
+################
+# scripts
+################
+mkdir -p ~/opt/
+cd ~/source/atlantis/scripts
+cp -r convert_media ~/opt/
