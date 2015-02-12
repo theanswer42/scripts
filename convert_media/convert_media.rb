@@ -4,8 +4,8 @@ require 'ostruct'
 require 'fileutils'
 require 'pp'
 
-require './logger'
-require './converter'
+require File.join(File.dirname(__FILE__), "logger")
+require File.join(File.dirname(__FILE__), "converter")
 
 class ConvertMedia::ConvertMedia
   private

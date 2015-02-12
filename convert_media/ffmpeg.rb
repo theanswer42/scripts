@@ -1,4 +1,4 @@
-require './logger.rb'
+require File.join(File.dirname(__FILE__), "logger")
 
 module ConvertMedia 
   class Ffmpeg

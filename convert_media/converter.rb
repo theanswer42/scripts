@@ -1,6 +1,7 @@
 require 'fileutils'
-require './logger'
-require './ffmpeg'
+
+require File.join(File.dirname(__FILE__), "logger")
+require File.join(File.dirname(__FILE__), "ffmpeg")
 
 module ConvertMedia
   class Converter
@@ -17,7 +18,7 @@ module ConvertMedia
       },
       :subtitle => {
         :copy => ["mov_text"],
-        :encode => ["srt", "ass", "xsub", "microdvd", "text"],
+        :encode => ["srt", "ass", "microdvd", "text"],
         :options => "mov_text",
       }
     }
@@ -55,9 +56,11 @@ module ConvertMedia
         result.merge!(convert_video(filename, options))
         unless options[:dry_run]
           srt_name = extract_srt(filename)
-          result[:converted] << srt_name unless srt_name.empty?
-          vtt_name = extract_vtt(filename)
-          result[:converted] << vtt_name unless vtt_name.empty?
+          unless srt_name.empty?
+            result[:converted] << srt_name 
+            vtt_name = extract_vtt(srt_name)
+            result[:converted] << vtt_name unless vtt_name.empty?
+          end
         end
       elsif streams.detect {|stream| stream[:codec_type] == "audio" && audio_codecs.include?(stream[:codec_name]) }
         # Audio stream found... must be an audio container
@@ -226,6 +229,7 @@ module ConvertMedia
       end
     end
 
+    SUBTITLE_CODECS_SUPPORTED = VIDEO_CTR_CODECS[:subtitle][:encode] + VIDEO_CTR_CODECS[:subtitle][:copy]
     def self.get_sub_stream(streams)
       # Usually, extracting the first subtitle track should be enough. Maybe extract
       # The first english subtitle track.
@@ -237,8 +241,8 @@ module ConvertMedia
       # First, try and find an english srt
       # Then the first english
       # finally, just pick the first
-
-      subtitle_streams = streams.select {|stream| stream[:codec_type] == 'subtitle' }
+      
+      subtitle_streams = streams.select {|stream| stream[:codec_type] == 'subtitle' && SUBTITLE_CODECS_SUPPORTED.include?(stream[:codec_name])}
       subtitle_streams.detect {|stream| stream[:codec_name] != "ass" && stream[:language] == "eng"} ||
         subtitle_streams.detect {|stream| stream[:language] == "eng"} ||
         subtitle_streams.first
