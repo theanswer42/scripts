@@ -183,7 +183,7 @@ module ConvertMedia
       return "" if !sub_stream
       sub_options = ["-map #{sub_stream[:stream_specifier]} -c:#{sub_stream[:stream_specifier]} srt"]
       begin
-        ::ConvertMedia::Ffmpeg.ffmpeg(["-fix_sub_duration"], mp4_name, sub_options, srt_name)
+        ::ConvertMedia::Ffmpeg.ffmpeg(["-fix_sub_duration"], filename, sub_options, srt_name)
       rescue Exception => e
         FileUtils.rm(srt_name) if File.exists?(srt_name)
         return ""
