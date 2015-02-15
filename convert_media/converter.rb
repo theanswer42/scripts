@@ -46,7 +46,7 @@ module ConvertMedia
     
     def self.convert(filename, options={})
       streams = ::ConvertMedia::Ffmpeg.ffprobe(filename)
-      video_codecs = VIDEO_CTR_CODECS[:video][:copy] + VIDEO_CTR_CODECS[:video][:encode]
+      video_codecs = (VIDEO_CTR_CODECS[:video][:copy] + VIDEO_CTR_CODECS[:video][:encode]) - AUDIO_CTR_CODECS[:video][:copy]
       audio_codecs = AUDIO_CTR_CODECS[:audio][:copy] + AUDIO_CTR_CODECS[:audio][:encode]
       result = {}
       
@@ -213,9 +213,10 @@ module ConvertMedia
 
     
     def self.get_stream_options(ctr_type, stream)
+      codecs = nil
       if ctr_type == :video
         codecs = VIDEO_CTR_CODECS[stream[:codec_type].to_sym]
-      elsif ctr_type == :audio
+      elsif ctr_type == :audio && stream[:codec_type] == "audio"
         codecs = AUDIO_CTR_CODECS[stream[:codec_type].to_sym]
       end
       return "" unless codecs
