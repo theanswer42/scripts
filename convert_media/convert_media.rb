@@ -97,6 +97,7 @@ class ConvertMedia::ConvertMedia
 
   def check_pid
     if File.exists?(options.pid)
+      @pid_exists = true
       raise "Another convert process is running: #{File.read(options.pid)}"
     end
     pid = File.open(options.pid, "w")
@@ -106,7 +107,9 @@ class ConvertMedia::ConvertMedia
   end
 
   def release_pid
-    FileUtils.rm(options.pid)
+    if !@pid_exists
+      FileUtils.rm(options.pid)
+    end
   end
 
   # Result always has these keys:
