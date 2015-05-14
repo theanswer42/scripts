@@ -2,8 +2,8 @@ require File.join(File.dirname(__FILE__), "logger")
 
 module ConvertMedia 
   class Ffmpeg
-    FFPROBE = "/opt/ffmpeg/bin/ffprobe"
-    FFMPEG = "/opt/ffmpeg/bin/ffmpeg"
+    FFPROBE = ENV["FFPROBE"] || "ffprobe"
+    FFMPEG = ENV["FFMPEG"] || "ffmpeg"
     
     private
     # return stdout+stderr
@@ -44,7 +44,7 @@ module ConvertMedia
       
       ffprobe_output = run_command("#{FFPROBE} -show_streams -i \"#{filename}\"").split("\n").collect {|l| l.strip }
 
-      stream_keys = ["codec_type", "codec_name", "TAG:language"]
+      stream_keys = ["codec_type", "codec_name", "TAG:language", "bit_rate", "max_bit_rate"]
       key_map = {"TAG:language" => "language"}
       
       streams = []

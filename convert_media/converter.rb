@@ -13,7 +13,7 @@ module ConvertMedia
       },
       :audio => {
         :copy => ["aac", "mp3"],
-        :encode => ["ac3", "dts", "flac", "vorbis"],
+        :encode => ["ac3", "dts", "flac", "vorbis", "dca"],
         :options => "libfdk_aac -cutoff 15000 -vbr 5",
       },
       :subtitle => {
@@ -222,7 +222,14 @@ module ConvertMedia
       return "" unless codecs
       
       if codecs[:copy].include?(stream[:codec_name])
-        return "copy"
+        # perhaps not the best way to do it, but don't know better.
+        # videos produced by some things use h.264 lossless. This needs
+        # to be detected and compressed. 
+        if stream[:codec_name] == "h264" && stream[:bit_rate] == "N/A" && stream[:max_bit_rate] == "N/A"
+          return codecs[:options]
+        else
+          return "copy"
+        end
       elsif codecs[:encode].include?(stream[:codec_name])
         return codecs[:options]
       else
