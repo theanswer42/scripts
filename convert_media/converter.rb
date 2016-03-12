@@ -5,15 +5,24 @@ require File.join(File.dirname(__FILE__), "ffmpeg")
 
 module ConvertMedia
   class Converter
+    # mjpeg should be copied, because many times it will be used for things like dvd-covers.
+    # But older cameras use mjpeg as their actual video codec, so, changing this to encode.
+    # Perhaps the code here should say: "If mjpeg is the only video codec, then encode it, otherwise copy it"
+    #
+    # Also removed mjpeg from audio_ctr_codecs. This is slightly problematic because for audio ctrs, mjpeg is
+    # always for copy...
+    # 
+    # For now, I will always try to encode mjpeg (this could lead to trouble)
+    
     VIDEO_CTR_CODECS = {
       :video => {
-        :copy => ["h264", "png", "mjpeg"],
-        :encode => ["mpeg4", "msmpeg4v3", "theora", "none"],
+        :copy => ["h264", "png"],
+        :encode => ["mpeg4", "msmpeg4v3", "theora", "none", "mpeg1video", "mpeg2video", "mjpeg", "dvvideo", "h263"],
         :options => "libx264 -preset slow -crf 18",
       },
       :audio => {
         :copy => ["aac", "mp3"],
-        :encode => ["ac3", "dts", "flac", "vorbis", "dca"],
+        :encode => ["ac3", "dts", "flac", "vorbis", "dca", "mp2", "pcm_s24le", "pcm_s16le", "amrnb", "pcm_u8", "mp1"],
         :options => "libfdk_aac -cutoff 15000 -vbr 5",
       },
       :subtitle => {
@@ -35,7 +44,7 @@ module ConvertMedia
         :options => "libopus",
       },
       :video => {
-        :copy => ["png", "mjpeg"]
+        :copy => ["png"]
       },
 
     }
@@ -65,6 +74,9 @@ module ConvertMedia
       elsif streams.detect {|stream| stream[:codec_type] == "audio" && audio_codecs.include?(stream[:codec_name]) }
         # Audio stream found... must be an audio container
         result = convert_audio(filename, options)
+      else
+        # No usable streams?
+        ::ConvertMedia::Logger.log_line("Not video or audio: #{filename}")
       end
       
       return result
@@ -135,6 +147,10 @@ module ConvertMedia
         raise "no video stream found for: \"#{filename}\""
       end
       output_options = []
+      
+      # Copy global metadata. This should preserve creation timestamps. 
+      output_options << "-map_metadata:g 0:g"
+      
       streams.each do |stream|
         # We'll handle subs later
         next if stream[:codec_type] == "subtitle"
