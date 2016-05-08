@@ -19,6 +19,8 @@ cp emacs.d/* ~/.emacs.d
 mkdir -p ~/.config/git
 cp ~/source/atlantis/dotfiles/gitignore ~/.config/git/ignore
 
+# xsession
+cp ~/source/atlantis/dotfiles/xsession ~/.xsession
 
 # crontab
 # Right now, I do not auto-install the crontab.
