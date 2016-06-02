@@ -53,7 +53,7 @@ done
 
 if test $YEAR == "0" || test $MONTH == "0"; then
     YEAR=`date +"%Y"`
-    MONTH=`date + "%m"`
+    MONTH=`date +"%m"`
 fi
 
 if ! test -d "$DOCUMENTS_DIR"; then
@@ -65,16 +65,18 @@ DEST_DIR="${DOCUMENTS_DIR}/${YEAR}/${MONTH}"
 
 mkdir -p "$DEST_DIR"
 
-if $SCAN == "1"; then
+if test $SCAN == "1"; then
     SCAN_NAME=`basename "$SCAN_NAME" .pdf`
 
-    $SCANNER "${DEST_DIR}/${SCAN_NAME}"
+    $SCANNER "${DEST_DIR}/${SCAN_NAME}.pdf"
+    echo "scanned document to ${DEST_DIR}/${SCAN_NAME}.pdf"
 else
     if ! test -f "$INPUT_FILENAME"; then
 	echo "input file does not exist or not given! use -i <input-filename>" >&2
 	exit 1
     fi
-
-    cp "$INPUT_FILENAME" "$DEST_DIR"
+    echo -n "copying $INPUT_FILENAME to $DEST_DIR..."
+    cp -i "$INPUT_FILENAME" "$DEST_DIR"
+    echo "done"
 fi
 
